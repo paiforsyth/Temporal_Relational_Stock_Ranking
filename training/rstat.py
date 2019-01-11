@@ -1,3 +1,5 @@
+import itertools
+import copy
 from tqdm import tqdm
 import logging
 import matplotlib.pyplot as plt
@@ -38,19 +40,32 @@ def get_industry_correlatons(abs_cor_mat):
     r_tensor = get_relation_data()
     index_to_industry = get_index_to_industry()
     index_to_correlation ={}
+    max_cor=-10
+    max_cor_dex =-10
     for index in index_to_industry:
         # plt.matshow(r_tensor[:,:,index])
         # plt.show()
         r_tensor_slice = r_tensor[:,:,index] #slice of relationships pertaining to a given industry
-        v = r_tensor_slice.sum(axis=0)
-        v[v>0]=1
-        # v shows us which stocks are in the industry
-        r_tensor_slice = r_tensor_slice - np.diag(v) #remove self references
-        mean = np.sum((r_tensor_slice * abs_cor_mat) ) / np.sum(r_tensor_slice)
-        std =( np.sum(r_tensor_slice * (abs_cor_mat - mean)**2  ) / np.sum(r_tensor_slice))**2
-        index_to_correlation[index] = (mean,std,index_to_industry[index])
 
-    #actually I want the vector of actual correlations for each industry use np,nonzero and advanced indexing to do this
+        v = np.diag(r_tensor_slice) 
+        pair_indexes = list(zip(*list(itertools.combinations(v.nonzero()[0].tolist(),2 )))) 
+        #import pdb; pdb.set_trace()
+
+        cors = abs_cor_mat[pair_indexes[0], pair_indexes[1]] #1d array consisting the of the correlations between
+        industry = index_to_industry[index]
+        index_to_correlation[index] = {"industry":industry, "correlations": cors, "mean": np.mean(cors), "std": np.std(cors)  }
+        if index_to_correlation[index]["mean"] > max_cor:
+            max_cor = index_to_correlation[index]["mean"]
+            max_cor_dex = index 
+
+    flat_cor_mat = abs_cor_mat.reshape(-1)
+    index_to_correlation[-1] = {"industry": "all", "correlations": flat_cor_mat, "mean": np.mean(flat_cor_mat), "std": np.std(flat_cor_mat)  }
+    mi = index_to_correlation[max_cor_dex]
+    ma = index_to_correlation[-1]
+    print("maximum correlation is the {} industry which has mean {} std {} ".format(mi["industry"], mi["mean"], mi["std"] ))
+    print("overall correlation is mean {} std {}".format(ma["mean"], ma["std"] ))
+
+
     return index_to_correlation
 
 
@@ -159,7 +174,7 @@ def test_fm_industry_cor(fname="test_eod_file"):
     mat = make_fully_masked_correlation_matrix(d)
     abs_cor_mat = abs(mat)
     index_to_cor = get_industry_correlatons(abs_cor_mat)
-    print(index_to_cor)
+    #print(index_to_cor)
  
     
 
